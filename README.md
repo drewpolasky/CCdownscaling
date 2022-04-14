@@ -4,18 +4,7 @@ This package provides implementation of several statistical climate downscaling 
 
 ## Requirements
 
-```
-numpy 
-scipy
-tensorflow=1.13.1    
-xarray  
-pandas    
-scikit-learn   
-matplotlib   
-seaborn   
-statsmodels    
-sliced
-```
+See [`environment.yml`](./environment.yml). Tensorflow is pinned in this conda environment in the interest of reproducibility.
 
 ## Usage
 
