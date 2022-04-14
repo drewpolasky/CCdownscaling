@@ -1,4 +1,6 @@
 name: ccdown
+channels:
+  - conda-forge
 dependencies:
   - python=3.7
   #
