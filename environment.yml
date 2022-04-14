@@ -1,0 +1,15 @@
+name: ccdown
+dependencies:
+  - python=3.7
+  #
+  - ipython
+  #
+  - matplotlib
+  - numpy
+  - pandas
+  - seaborn
+  - scikit-learn
+  - scipy
+  - statsmodels
+  - tensorflow=1.14.0
+  - xarray
