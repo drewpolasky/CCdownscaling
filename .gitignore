@@ -1,7 +1,8 @@
 *~
 __pycache__/*
 example/*~
-example/data/*
+example/data/*/
+example/data/*.gz
 example/example_figures/*
 *.pyc
 example/*.pyc
