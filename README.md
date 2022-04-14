@@ -1,7 +1,15 @@
 This package provides implementation of several statistical climate downscaling techniques, as well as evaluation tools for downscaling outputs. 
 
 installation:
-
+numpy
+scipy
+tensorflow=1.13.1
+xarray
+pandas
+scikit-learn
+matplotlib
+seaborn
+statsmodels
 
 
 use:
