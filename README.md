@@ -24,6 +24,7 @@ This example requires some example data, which can be downloaded from: ...
 
 Once that data is in place, the example can be run with: 
 ```bash
-python ./example/ohare_example.py 
+cd example
+python ohare_example.py
 ```
 And runs through several downscaling methods, including SOM, random forest, and quantile mapping. All these methods are then compared on PDF skill score, KS test, RMSE, bias, and autocorrelation, along with the undownscaled values from the NCEP reanalysis.
