@@ -12,7 +12,7 @@ import matplotlib
 from matplotlib import cm
 import matplotlib.pyplot as plt
 
-sys.path.append('/gpfs/group/jle7/default/adp29/tensorflow_som/')
+sys.path.append('../tensorflow_som/')
 from tf_som import SelfOrganizingMap as SOM
 
 class som_downscale(object):
@@ -58,15 +58,15 @@ class som_downscale(object):
 			self.output_weights = som.output_weights
 			# print(som.output_weights)
 			print('time to train for ' + str(self.epochs) + ' epochs: ', time.time() - trainTime)
+		self.trained = True
 
 	def save(self, save_path):
-		if self.trained:
-			pickle.dump(self.output_weights, open(save_path, 'wb'))
-		else:
-			print("model has not been trained, can\'t save")
+		pickle.dump(self.output_weights, open(save_path+'weights.p', 'wb'))
+		pickle.dump(self.clusters, open(save_path+'clusters.p', 'wb'))
 
 	def load(self, save_path):
-		self.output_weights = pickle.load(open(save_path, 'rb'))
+		self.output_weights = pickle.load(open(save_path+'weights.p', 'rb'))
+		self.clusters = pickle.load(open(save_path+'clusters.p', 'rb'))
 
 	def fit_pdfs(self, model_timeseries, obs_timeseries):
 		for i in range(len(model_timeseries)):
@@ -123,16 +123,17 @@ class som_downscale(object):
 
 	def quantization_error(self, model_timeseries):
 		#distance between data points and their nearest nodes
+		distances = []
 		for i in range(len(model_timeseries)):
 			dayVector = model_timeseries[i]
 			min_index = min([i for i in range(len(self.output_weights))],
 							key=lambda x: np.linalg.norm(dayVector - self.output_weights[x]))
-			distances.append(np.linalg.norm(dayVector - somWeights[gridPoint][min_index]))
+			distances.append(np.linalg.norm(dayVector - self.output_weights[min_index]))
 
 		quant_errors = np.mean(distances)
 		return quant_errors
 
-	def topological_error(self, model_timeseries):
+	def topograpical_error(self, model_timeseries):
 		#look at the best and second best nodes, and see how far apart they are -- closer is general better, idnicating the topology of the input space is being maintained in the 2-d graph
 		topo_errors = []
 		te = 0
@@ -141,7 +142,7 @@ class som_downscale(object):
 			node_list = sorted([j for j in range(len(self.output_weights))],
 							key=lambda x: np.linalg.norm(dayVector - self.output_weights[x]))
 			min_index, second_index = node_list[0], node_list[1]
-			if is_adjacent(min_index, second_index):
+			if self.is_adjacent(min_index, second_index):
 				te += 0
 			else:
 				te += 1
@@ -200,10 +201,10 @@ class som_downscale(object):
 			axis = axes[loc[0], loc[1]]
 			contours = axis.contourf(plot_zs, levels = np.linspace(minValue, maxValue, 20), cmap=cmap, vmin = minValue, vmax = maxValue, **kwargs)
 
-		fig.subplots_adjust(right=0.9)
-		cbar_ax = fig.add_axes([0.925, 0.15, 0.02, 0.6])
-		fig.colorbar(contours, cax = cbar_ax, format = fmt)
-		return fig, axes
+		fig.subplots_adjust(right=0.85)
+		cbar_ax = fig.add_axes([0.9, 0.15, 0.02, 0.6])
+		cbar = fig.colorbar(contours, cax = cbar_ax, format = fmt)
+		return fig, axes, cbar
 		
 	def node_stats(self):
 		"""

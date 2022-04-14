@@ -52,26 +52,27 @@ class quantile_mapping(object):
 		return sklearn.metrics.r2_score(y_true, y_pred)
 
 class two_step_random_forest(object):
-	#I want to do a two part random forest - one that classifies wet vs dry days, and one that regresses for qpf on the wet days, since the random forest by itself does not do a good job with the 
-	#This will only really make sense for prcp downscaling.
+	#This is a two-part random forest model, for use especially with precipitation downscaling. This first part is a calssifier, to distinguish between dry and wet days. The second kicks in on the wet days, to produce a value for how much precipitation falls on those days. 
+	#trace_value: value to count everything below as "no precipitation"
 
-	def __init__(self):
+	def __init__(self, trace_value=0.01):
 		self.pop_rf = sklearn.ensemble.RandomForestClassifier()
 		self.qpf_rf = sklearn.ensemble.RandomForestRegressor()
-		self.threshold = 0.5
+		self.trace_value = trace_value 
 
 	def fit(self, x_train, y_train):
 		#recode to binary yes no on rain
-		y_train_class = np.array([1 if a > 0 else a for a in y_train]).astype(int)
+		y_train_class = np.array([1 if a > self.trace_value else 0 for a in y_train]).astype(int)
 		#print(np.count_nonzero(y_train))
 
 		#train classifier
 		#print(x_train.shape, y_train_class.shape)
 		self.pop_rf.fit(x_train, y_train_class)
 
-		#train regressor
-		#y_train_qpf = 
-		#x_train_qpf =  
+		#train regressor on the non-dry days
+		y_train_qpf = y_train[y_train_class != 0]
+		x_train_qpf = x_train[y_train_class != 0]
+		print(x_train_qpf.shape, y_train_qpf.shape)
 		self.qpf_rf.fit(x_train, y_train)
 
 	def predict(self, x_test):
@@ -116,7 +117,7 @@ def test_prcp_model():
 	model.fit(sim, obs)
 	sim_transformed = model.predict(sim)
 	test_transformed = model.predict(test)
-	print(model.score(sim_transformed, obs))
+	print(model.score(sim, obs))
 
 	print('sim trasnformed, test transformed, obs mean')
 	print(np.nanmean(sim_transformed), np.nanmean(test_transformed), np.nanmean(obs))
@@ -163,4 +164,5 @@ def test_temperature_model():
 	plt.show()
 
 if __name__ == '__main__':
-	test_temperature_model()
+	#test_temperature_model()
+	test_prcp_model()

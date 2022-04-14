@@ -15,9 +15,9 @@ def ks_testing(modelData, histData):
 
 def pdf_skill_score(dist1, dist2, n = 20, plot = False, non_zero = False):
 	#calcuate the PDF skill score (Perkins et al. 2007, https://journals.ametsoc.org/view/journals/clim/20/17/jcli4253.1.xml) between 2 distributions
-	#dist1 and dist2 are lists or numpy arrays, n is an int
+	#dist1 and dist2 are lists or numpy arrays, n is an int for the number of bins in the pdf
+	#non_zero is bool option to only use non-zero values, which can be useful for assesing precipitation
 	score = 0
-	#print(np.nanmean(dist1), np.nanmean(dist2))
 	dist1 = np.sort(np.array(dist1))
 	dist2 = np.sort(np.array(dist2))
 
@@ -32,17 +32,11 @@ def pdf_skill_score(dist1, dist2, n = 20, plot = False, non_zero = False):
 
 	if plot:
 		plt.hist([dist1, dist2], bins=bins, density=True, label=['model','obs'])
-		#sns.kdeplot(dist1, label='model')
-		#sns.kdeplot(dist2, label='obs')
 		plt.legend()
 		plt.show()
-	#print(bins)
-	#print(hist1)
-
+	
 	for i in range(len(bins)-1):
 		score += min(hist1[i], hist2[i])
-	#score = score/len(dist2)
-	#print(score)
 	return score
 
 def threshold_frequency(model_data, obs_data, threshold):
