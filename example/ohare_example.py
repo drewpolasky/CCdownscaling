@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import acf
 
-sys.path.append('/gpfs/group/jle7/default/adp29/downscaling_package')
+sys.path.append('../')
 import som_downscale
 import correction_downscale_methods
 import utilities
