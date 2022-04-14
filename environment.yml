@@ -4,7 +4,9 @@ dependencies:
   #
   - ipython
   #
+  - dask-core
   - matplotlib
+  - netcdf4
   - numpy
   - pandas
   - seaborn
@@ -13,3 +15,7 @@ dependencies:
   - statsmodels
   - tensorflow=1.14.0
   - xarray
+  #
+  - pip
+  - pip:
+    - https://github.com/joshloyal/sliced/archive/243bde2.zip
