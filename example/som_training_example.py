@@ -9,7 +9,7 @@ import sklearn
 import matplotlib
 import matplotlib.pyplot as plt
 
-sys.path.append('/gpfs/group/jle7/default/adp29/downscaling_package')
+sys.path.append('../')
 import som_downscale
 import correction_downscale_methods
 import utilities
