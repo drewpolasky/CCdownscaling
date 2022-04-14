@@ -10,6 +10,7 @@ scikit-learn
 matplotlib   
 seaborn   
 statsmodels    
+sliced     
   
 
 use:
