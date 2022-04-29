@@ -9,7 +9,7 @@ See [`environment.yml`](./environment.yml). Tensorflow is pinned in this conda e
 ## Usage
 
 An example use case for downscaling precipitation at Chicago O'Hare airport can be found in the example folder.
-This example requires some example data, which can be downloaded from: ...
+This example requires some example data, which can be downloaded from: https://zenodo.org/record/6506677
 
 Once that data is in place, the example can be run with: 
 ```bash
