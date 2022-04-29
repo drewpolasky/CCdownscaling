@@ -1,0 +1,8 @@
+LICENSE
+README.md
+pyproject.toml
+setup.py
+src/CCdownscaling.egg-info/PKG-INFO
+src/CCdownscaling.egg-info/SOURCES.txt
+src/CCdownscaling.egg-info/dependency_links.txt
+src/CCdownscaling.egg-info/top_level.txt
