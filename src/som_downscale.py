@@ -1,7 +1,8 @@
-import sys
+
 import time
 import random
 import math
+import pickle
 
 import numpy as np
 import tensorflow as tf
@@ -10,6 +11,7 @@ import seaborn as sns
 import matplotlib
 from matplotlib import cm
 import matplotlib.pyplot as plt
+import sklearn.ensemble
 
 from src.tensorflow_som.tf_som import SelfOrganizingMap as SOM
 
@@ -23,6 +25,8 @@ class som_downscale(object):
 		self.alpha = alpha
 		self.num_procs = num_procs
 		self.clusters = {}
+		self.node_model_type = 'random'
+		self.node_models = []
 
 	def fit(self, model_timeseries, obs_timeseries, seed=1):
 		"""
@@ -33,6 +37,8 @@ class som_downscale(object):
 		"""
 		self.map(model_timeseries, seed=seed)
 		self.fit_pdfs(model_timeseries, obs_timeseries)
+		if self.node_model_type.lower() == 'random_forest':
+			self.train_rf_node_models(model_timeseries, obs_timeseries)
 
 	def map(self, model_timeseries, seed=1):
 		graph = tf.Graph()
@@ -83,13 +89,30 @@ class som_downscale(object):
 
 			self.clusters[min_index].append(obs_timeseries[i])
 
+	def train_rf_node_models(self, model_timeseries, obs_timeseries):
+		node_days = [[] for i in range(len(self.clusters))]
+		for i in range(len(model_timeseries)):
+			dayVector = model_timeseries[i]
+			min_index = min([j for j in range(len(self.output_weights))],
+							key=lambda x: np.linalg.norm(dayVector - self.output_weights[x]))
+			node_days[min_index].append(i)
+
+		for i in range(len(self.clusters)):
+			x_train = model_timeseries[node_days[i]]
+			y_train = obs_timeseries[node_days[i]]
+			self.node_models.append(sklearn.ensemble.RandomForestRegressor())
+			self.node_models[i].fit(x_train, y_train)
+
 	def predict(self, model_timeseries):
 		output = []
 		for i in range(len(model_timeseries)):
 			dayVector = model_timeseries[i]
 			min_index = min([i for i in range(len(self.output_weights))],
 							key=lambda x: np.linalg.norm(dayVector - self.output_weights[x]))
-			dayValue = self.generate_obs(min_index)
+			if self.node_model_type == 'random':
+				dayValue = self.generate_obs(min_index)
+			else:
+				dayValue = self.generate_rf_obs(min_index, dayVector)
 			output.append(dayValue)
 		return np.array(output)
 
@@ -126,6 +149,15 @@ class som_downscale(object):
 			return xnew[min_index]
 		else:
 			return (max(clusterValues))  # if all the cluster values are the same
+
+	def generate_rf_obs(self, index, day_vector):
+		"""
+		Rather than using a random selection from the set of days in each som node, train an additional model,
+		one the days that fall on that som node, and use that to generate the day observations
+		"""
+		day_model = self.node_models[index]
+		day_value = day_model.predict(day_vector)
+		return day_value
 
 	def quantization_error(self, model_timeseries):
 		# distance between data points and their nearest nodes

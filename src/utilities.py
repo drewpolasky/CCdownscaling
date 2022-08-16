@@ -1,7 +1,7 @@
 # Helper functions
 
 import numpy as np
-
+import pandas as pd
 
 def normalize_climate_data(model_data, means=None, stdevs=None):
 	"""
@@ -9,19 +9,21 @@ def normalize_climate_data(model_data, means=None, stdevs=None):
 	based on those. if means and standard deviations are given, calculates the z-scores from those values, rather than
 	the model_data, so that the different periods of data can be compared If means and stdevs are None, scale to the
 	mean and stdev of the data :param model_data: example shape - (10950x175) for 30 years with 7 variables on 5x5
-	grid :param means: shape should match all but first axis of model_data :param stdevs: shape same as means :return:
-	scaled model_data; returns same stdevs and means if they are passed in, and the stdev and means of the climate
+	grid
+	:param means: shape should match all but first axis of model_data
+	:param stdevs: shape same as means
+	:return: scaled model_data; returns same stdevs and means if they are passed in, and the stdev and means of the climate
 	data if none are passed in.
 	"""
 	if means is None:
-		means = np.mean(model_data, axis=0)
-		stdevs = np.std(model_data, axis=0)
+		means = np.nanmean(model_data, axis=0)
+		stdevs = np.nanstd(model_data, axis=0)
 		model_data = model_data - means
 		model_data = model_data / stdevs
 		return model_data, means, stdevs
 	else:
-		model_means = np.mean(model_data, axis=0)
-		model_stdevs = np.std(model_data, axis=0)
+		model_means = np.nanmean(model_data, axis=0)
+		model_stdevs = np.nanstd(model_data, axis=0)
 		model_data = model_data - means
 		model_data = model_data / stdevs
 		return model_data, model_means, model_stdevs
@@ -82,6 +84,20 @@ def remove_missing(historicalData, climateData):
 			newHist.append(historicalData[i])
 			newClim.append(climateData[i])
 	return np.array(newHist), np.array(newClim)
+
+
+def generate_dates_list(start_date, end_date, years):
+	"""
+	generate list of dates between a start and end date for a given span of years
+	@param years: list
+	@param start_date: str, month/day
+	@param end_date: str, month/day
+	@return:
+	"""
+	dates = []
+	for year in years:
+		dates.extend(pd.date_range(str(year)+'/'+start_date, str(year)+'/'+end_date))
+	return dates
 
 
 if __name__ == '__main__':

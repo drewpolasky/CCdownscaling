@@ -86,7 +86,7 @@ def som_size_selection(downscaling_target='precip', station_id='725300-94846'):
 	quant_errors = []
 	topo_errors = []
 	for size in sizes:
-		som = som_downscale.som_downscale(som_x=size[0], som_y=size[1], batch=512, alpha=0.1, epochs=50)
+		som = som_downscale.som_downscale(som_x=size[0], som_y=size[1], batch=512, alpha=0.1, epochs=50, node_model_type='random_forest')
 		som.fit(training_data, train_hist, seed=1)
 		quant_errors.append(som.quantization_error(training_data))
 		topo_errors.append(som.topograpical_error(training_data))

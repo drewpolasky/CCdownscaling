@@ -1,8 +1,6 @@
 # This is an example usage of the downscaling package,
 # using GSOD station data for Chicago Midway airport
 
-
-import sys
 import random
 
 import xarray
@@ -14,7 +12,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from statsmodels.tsa.stattools import acf
 
-from src import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities
+from src import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, train_test_splits
 
 # for reproducibility
 seed = 1
@@ -54,6 +52,9 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 	date_mask = ((station_data['time'] >= start) & (station_data['time'] <= end))
 	station_data = station_data[date_mask]
 
+	#Identify the most important variables, and do dimension reduction, if desired
+	##TODO
+
 	hist_data = station_data[downscaling_target].values
 	# Convert units, F to C for temperature, in/day to mm/day for precip
 	if downscaling_target == 'max_temp':
@@ -77,24 +78,34 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 	input_data = np.concatenate(input_data, axis=1)
 	input_data = np.array(input_data)
 
-	# Drop days with NaN values for the observation:
-	hist, rean_precip = utilities.remove_missing(hist_data, rean_precip)
-	hist_data, input_data = utilities.remove_missing(hist_data, input_data)
+	#Drop leap days for ease of use:
+	hist_data = utilities.remove_leap_days(hist_data)
+	rean_precip = utilities.remove_leap_days(rean_precip)
+	input_data = utilities.remove_leap_days(input_data)
 
+	# normalize (z-score) the reanalysis data, for use in downscaling methods
 	input_data, input_means, input_stdevs = utilities.normalize_climate_data(input_data)
 
 	# split train and test sets:
-	# train_split = int(round(input_data.shape[0]*0.8))
-	train_split = 8765  # split out the first 24 years for the training data, last 6 years for the test set
-	training_data = input_data[0:train_split, :]
-	train_hist = hist_data[0:train_split]
-	test_data = input_data[train_split:, :]
-	test_hist = hist_data[train_split:]
-	rean_precip_train = rean_precip[0:train_split]
-	rean_precip_test = rean_precip[train_split:]
-	print(training_data.shape, test_data.shape)
+	# with a simple split:
+	train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(input_data, hist_data, rean_precip)
+	# selecting the highest precip years:
+	train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_max_target_years(input_data, hist_data, 'max', time_period='year', split=0.8, rean_data=rean_precip)
+	# training on the spring, testing on the summer:
+	train_dates = utilities.generate_dates_list('3/1','5/31',list(range(1976,2006)))
+	test_dates = utilities.generate_dates_list('6/1','8/31',list(range(1976,2006)))
+	#train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_data, test_data, train_hist, test_hist = train_test_splits.select_season_train_test(reanalysis_data, hist_data, train_dates,
+	#																		test_dates, rean_data=rean_precip)
 
-	# intialize the different methods
+	print(train_data.shape, test_data.shape)
+
+	# Drop days with NaN values for the observation:
+	hist, rean_precip_train = utilities.remove_missing(train_hist, rean_precip_train)
+	hist_data, train_data = utilities.remove_missing(train_hist, train_data)
+	test, rean_precip_test = utilities.remove_missing(test_hist, rean_precip_test)
+	test_hist, test_data = utilities.remove_missing(test_hist, test_data)
+
+	# initialize the different methods
 	som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)
 	rf_two_part = correction_downscale_methods.two_step_random_forest()
 	random_forest = sklearn.ensemble.RandomForestRegressor()
@@ -102,10 +113,10 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 	linear = sklearn.linear_model.LinearRegression()
 
 	# train
-	som.fit(training_data, train_hist, seed=1)
-	random_forest.fit(training_data, train_hist)
-	rf_two_part.fit(training_data, train_hist)
-	linear.fit(training_data, train_hist)
+	som.fit(train_data, train_hist, seed=1)
+	random_forest.fit(train_data, train_hist)
+	rf_two_part.fit(train_data, train_hist)
+	linear.fit(train_data, train_hist)
 	qmap.fit(rean_precip_train, train_hist)
 
 	# generate outputs from the test data
@@ -125,7 +136,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 
 	# first, the som specific plots
 	freq, avg, dry = som.node_stats()
-	ax = som.heat_map(training_data, annot=avg)
+	ax = som.heat_map(train_data, annot=avg)
 	plt.yticks(rotation=0)
 	plt.savefig('example_figures/ohare_heatmap_5x7_' + downscaling_target + '.png')
 	plt.show()
@@ -169,15 +180,15 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 
 	# finally, some plots comparing the outputs
 	fig, ax = plot_kde(outputs, names, hist_data, scores, downscaling_target)
-	plt.savefig('example_figures/ohare_' + downscaling_target + '_methods_compare_kde.png')
+	plt.savefig('example_figures/ohare_maxYears_' + downscaling_target + '_methods_compare_kde.png')
 	plt.show()
 
 	fig, ax = plot_autocorrelation(outputs, names, hist_data)
-	plt.savefig('example_figures/ohare_' + downscaling_target + '_methods_compare_autocorr.png')
+	plt.savefig('example_figures/ohare_maxYears_' + downscaling_target + '_methods_compare_autocorr.png')
 	plt.show()
 
 	fig, ax = plot_histogram(outputs, names, hist_data)
-	plt.savefig('example_figures/ohare_' + downscaling_target + '_methods_compare_histogram.png')
+	plt.savefig('example_figures/ohare_maxYears_' + downscaling_target + '_methods_compare_histogram.png')
 	plt.show()
 
 
