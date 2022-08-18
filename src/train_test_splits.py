@@ -7,15 +7,15 @@ import xarray
 
 from src import utilities
 
-def simple_split(x_data, y_data, rean_y=None):
-	train_split = 8765  # split out the first 24 years for the training data, last 6 years for the test set
-	train_x = x_data[0:train_split, :]
-	train_y = y_data[0:train_split]
-	test_x = x_data[train_split:, :]
-	test_y = y_data[train_split:]
+def simple_split(x_data, y_data, rean_y=None, train_split=8760):
+
+	train_x = x_data.isel(time=slice(0,train_split))
+	train_y = y_data.isel(time=slice(0,train_split))
+	test_x = x_data.isel(time=slice(train_split,-1))
+	test_y = y_data.isel(time=slice(train_split,-1))
 	if rean_y is not None:
-		rean_train = rean_y[0:train_split]
-		rean_test = rean_y[train_split:]
+		rean_train = rean_y.isel(time=slice(0,train_split))
+		rean_test = rean_y.isel(time=slice(train_split,-1))
 		return train_x, train_y, test_x, test_y, rean_train, rean_test
 	else:
 		return train_x, train_y, test_x, test_y
@@ -48,7 +48,8 @@ def select_max_target_years(x_data, y_data, y_target, time_period='year', split=
 
 	train_average = y_train.mean('time')
 	test_average = y_test.mean('time')
-	print(train_average, test_average)
+	print('train period average: ', train_average.values)
+	print('test period averaged: ', test_average.values)
 	if rean_data is not None:
 		rean_train = rean_data.sel(time=(rean_data.time.dt.year.isin(train_periods)))
 		rean_test = rean_data.sel(time=(rean_data.time.dt.year.isin(test_periods)))
@@ -69,6 +70,10 @@ def select_season_train_test(x_data, y_data, train_dates, test_dates, rean_data 
 	x_test = x_data.sel(time=x_data.time.isin(test_dates))
 	y_train = y_data.sel(time=y_data.time.isin(train_dates))
 	y_test = y_data.sel(time=y_data.time.isin(test_dates))
+	train_average = y_train.mean('time')
+	test_average = y_test.mean('time')
+	print('train period average: ', train_average.values)
+	print('test period averaged: ', test_average.values)
 	if rean_data is not None:
 		rean_train = rean_data.sel(time=rean_data.time.isin(train_dates))
 		rean_test = rean_data.sel(time=rean_data.time.isin(test_dates))
@@ -117,14 +122,15 @@ def test_train_test_splits():
 	# add dates to the observation data, using the same dates as the reanalysis data
 	dates = reanalysis_data['time']
 	hist_data = xarray.DataArray(data=hist_data, dims=['time'], coords={'time':dates})
-	train_data, test_data, train_hist, test_hist = select_max_target_years(reanalysis_data, hist_data, 'max', time_period='year', split=0.8)
-	print(train_data, test_data)
+	#train_data, test_data, train_hist, test_hist = select_max_target_years(reanalysis_data, hist_data, 'max', time_period='year', split=0.8)
+	#print(train_data, test_data)
 
 	# season select
 	train_dates = utilities.generate_dates_list('3/1','5/31',list(range(1976,2006)))
 	test_dates = utilities.generate_dates_list('6/1','8/31',list(range(1976,2006)))
+	print(train_dates)
 	train_data, test_data, train_hist, test_hist = select_season_train_test(reanalysis_data, hist_data, train_dates, test_dates)
-	print(train_data, test_data)
+	print(train_data)
 
 if __name__ == '__main__':
 	test_train_test_splits()
