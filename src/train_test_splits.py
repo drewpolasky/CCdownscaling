@@ -122,15 +122,14 @@ def test_train_test_splits():
 	# add dates to the observation data, using the same dates as the reanalysis data
 	dates = reanalysis_data['time']
 	hist_data = xarray.DataArray(data=hist_data, dims=['time'], coords={'time':dates})
-	#train_data, test_data, train_hist, test_hist = select_max_target_years(reanalysis_data, hist_data, 'max', time_period='year', split=0.8)
-	#print(train_data, test_data)
+	train_data, test_data, train_hist, test_hist = select_max_target_years(reanalysis_data, hist_data, 'max', time_period='year', split=0.8)
+	print(train_data, test_data)
 
 	# season select
 	train_dates = utilities.generate_dates_list('3/1','5/31',list(range(1976,2006)))
 	test_dates = utilities.generate_dates_list('6/1','8/31',list(range(1976,2006)))
-	print(train_dates)
 	train_data, test_data, train_hist, test_hist = select_season_train_test(reanalysis_data, hist_data, train_dates, test_dates)
-	print(train_data)
+	print(train_data, test_data)
 
 if __name__ == '__main__':
 	test_train_test_splits()

@@ -7,3 +7,4 @@ example/*.gz
 example/example_figures/*
 *.pyc
 example/*.pyc
+.idea/*
