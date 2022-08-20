@@ -13,7 +13,7 @@ import seaborn as sns
 from statsmodels.tsa.stattools import acf
 
 from src import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, \
-    train_test_splits
+    train_test_splits, climdex
 
 # for reproducibility
 seed = 1
@@ -81,18 +81,18 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     hist_data = xarray.DataArray(data=hist_data, dims=['time'], coords={'time': dates})
     rean_precip = xarray.DataArray(data=rean_precip, dims=['time'], coords={'time': dates})
     # with a simple split:
-    #train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
-    #    reanalysis_data, hist_data, rean_precip)
+    train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
+        reanalysis_data, hist_data, rean_precip)
 
     # selecting the highest precip/temperature years:
-    #train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_max_target_years(
-    #   reanalysis_data, hist_data, 'max', time_period='year', split=0.8, rean_data=rean_precip)
+    train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_max_target_years(
+       reanalysis_data, hist_data, 'max', time_period='year', split=0.8, rean_data=rean_precip)
 
     # training on the spring, testing on the summer:
     train_dates = utilities.generate_dates_list('3/1', '5/31', list(range(1976, 2006)))
     test_dates = utilities.generate_dates_list('6/1', '8/31', list(range(1976, 2006)))
-    train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_season_train_test(
-    	reanalysis_data, hist_data, train_dates, test_dates, rean_data=rean_precip)
+    #train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_season_train_test(
+    #	reanalysis_data, hist_data, train_dates, test_dates, rean_data=rean_precip)
 
     input_train_data = []
     input_test_data = []
@@ -118,10 +118,12 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     # Drop days with NaN values for the observation:
     hist, rean_precip_train = utilities.remove_missing(train_hist, rean_precip_train)
     train_hist, train_data = utilities.remove_missing(train_hist, train_data)
-    test, rean_precip_test = utilities.remove_missing(test_hist, rean_precip_test)
-    test_hist, test_data = utilities.remove_missing(test_hist, test_data)
+    #test, rean_precip_test = utilities.remove_missing(test_hist, rean_precip_test)
+    #test_hist, test_data = utilities.remove_missing(test_hist, test_data)
 
     print(train_data.shape, test_data.shape, train_hist.shape, test_hist.shape)
+    print(np.nanpercentile(train_hist, 90))
+    print(np.nanpercentile(test_hist, 90))
 
     # initialize the different methods
     som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)
@@ -144,6 +146,13 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     linear_output = linear.predict(test_data)
     qmap_output = qmap.predict(rean_precip_test)
 
+    # generate outputs from the train data for comparision
+    som_train_output = som.predict(train_data)
+    random_forest_train_output = random_forest.predict(train_data)
+    rf_two_part_train_output = rf_two_part.predict(train_data)
+    linear_train_output = linear.predict(train_data)
+    qmap_train_output = qmap.predict(rean_precip_train)
+
     # Include the reanalysis precipitation as an undownscaled comparison
     names = ['SOM', 'Random Forest', 'RF Two Part', 'Linear', 'Qmap', 'NCEP']
     outputs = [som_output, random_forest_output, rf_two_part_output, linear_output, qmap_output, rean_precip_test]
@@ -156,7 +165,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     freq, avg, dry = som.node_stats()
     ax = som.heat_map(train_data, annot=avg)
     plt.yticks(rotation=0)
-    plt.savefig('example_figures/ohare_heatmap_seasonSplit_5x7_' + downscaling_target + '.png')
+    plt.savefig('example_figures/ohare_heatmap_highSplit_5x7_' + downscaling_target + '.png')
     # plt.show()
     plt.close()
     i = 0
@@ -177,7 +186,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
         # fig.suptitle(var)
         units = {'air': '(K)', 'rhum': '(%)', 'uwnd': r'(ms$^{-1}$)', 'vwnd': r'(ms$^{-1}$)', 'hgt': '(m)'}
         cbar.set_label(var.capitalize() + ' ' + units[var], rotation='horizontal', labelpad=20)
-        fig.savefig('example_figures/SOM_nodes_seasonSplit_NCEP_' + var + '.png')
+        fig.savefig('example_figures/SOM_nodes_highSplit_NCEP_' + var + '.png')
         # plt.show()
         plt.close()
         i += 1
@@ -187,34 +196,60 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     np.set_printoptions(precision=2, suppress=True)
     i = 0
     for output in outputs:
-        pdf_score = distribution_tests.pdf_skill_score(output, test_hist)
-        ks_stat, ks_probs = distribution_tests.ks_testing(output, test_hist)
-        rmse = sklearn.metrics.mean_squared_error(test_hist, output, squared=False)
-        bias = error_metrics.calc_bias(output, test_hist)
+        noNan_test_hist, noNan_output = utilities.remove_missing(test_hist, output)
+        pdf_score = distribution_tests.pdf_skill_score(noNan_output, noNan_test_hist)
+        ks_stat, ks_probs = distribution_tests.ks_testing(noNan_output, noNan_test_hist)
+        rmse = sklearn.metrics.mean_squared_error(noNan_test_hist, noNan_output, squared=False)
+        bias = error_metrics.calc_bias(noNan_output, noNan_test_hist)
 
         print(names[i], round(pdf_score, 3), round(ks_stat, 2), round(rmse, 2), round(bias, 2))
         scores[names[i]] = [round(pdf_score, 3), round(ks_stat, 2), round(rmse, 2), round(bias, 2)]
         i += 1
 
     # finally, some plots comparing the outputs
-    fig, ax = plot_kde(outputs, names, hist_data, scores, downscaling_target)
-    plt.savefig('example_figures/ohare_maxYears_seasonSplit_' + downscaling_target + '_methods_compare_kde.png')
-    plt.show()
+    fig, ax = plot_kde(outputs, names, test_hist, scores, downscaling_target)
+    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_kde.png')
+    #plt.show()
 
-    fig, ax = plot_autocorrelation(outputs, names, hist_data)
-    plt.savefig('example_figures/ohare_maxYears_seasonSplit_' + downscaling_target + '_methods_compare_autocorr.png')
-    plt.show()
+    fig, ax = plot_autocorrelation(outputs, names, test_hist)
+    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_autocorr.png')
+    #plt.show()
 
-    fig, ax = plot_histogram(outputs, names, hist_data)
-    plt.savefig('example_figures/ohare_maxYears_seasonSplit_' + downscaling_target + '_methods_compare_histogram.png')
-    plt.show()
+    fig, ax = plot_histogram(outputs, names, test_hist)
+    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_histogram.png')
+    #plt.show()
+    plt.close('all')
 
+    for i in range(len(outputs)):
+        climdex_values, func_list = climdex.calc_climdex(outputs[i], downscaling_target, reference_data = train_hist)
+        print()
+        print(names[i])
+        climdex.print_indices(climdex_values, func_list)
 
-def plot_kde(outputs, names, hist_data, scores, downscaling_target):
+    fig, axes = plt.subplots(1,3, figsize=(15,8), sharex=True, sharey=True)
+    outputs = [[som_train_output, som_output, train_hist],[random_forest_train_output, random_forest_output, train_hist],[qmap_train_output, qmap_output, train_hist]]
+    names = [['SOM train', 'SOM wet years', 'Train Obs'],['RF train', 'RF wet years', 'Train Obs'],['QMAP train', 'QMAP wet years','Train Obs']]
     i = 0
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+    letters = ['a)','b)','c)']
+    for axis in axes:
+        for j in range(len(outputs[i])):
+            print(round(np.mean(outputs[i][j]), 2), names[i][j])
+        plot_histogram(outputs[i], names[i], test_hist, downscaling_target=downscaling_target, ax=axis, fig=fig)
+        axis.text(axis.get_xlim()[0], axis.get_ylim()[1] + 0.002, letters[i])
+        i+=1
+    plt.savefig('example_figures/ohare_maxYears_trainTest_'+downscaling_target+'_methods_compare_histogram3panel.png')
+    plt.show()
+
+
+def plot_kde(outputs, names, hist_data, scores=None, downscaling_target=None, ax=None, fig=None):
+    i = 0
+    if ax is None:
+        fig, ax = plt.subplots(nrows=1, ncols=1)
     for output in outputs:
-        sns.kdeplot(output, label=names[i] + ' ' + str(scores[names[i]][0]), ax=ax)
+        if scores is not None:
+            sns.kdeplot(output, label=names[i] + ' ' + str(scores[names[i]][0]), ax=ax)
+        else:
+            sns.kdeplot(output, label=names[i], ax=ax)
         i += 1
     sns.kdeplot(hist_data, color='k', lw=2.0, label='Obs', ax=ax)
     if downscaling_target == 'max_temp':
@@ -224,18 +259,19 @@ def plot_kde(outputs, names, hist_data, scores, downscaling_target):
     return fig, ax
 
 
-def plot_histogram(outputs, names, hist_data):
-    fig, ax = plt.subplots(nrows=1, ncols=1)
+def plot_histogram(outputs, names, hist_data, fig = None, ax = None, downscaling_target=None):
+    if ax is None:
+        fig, ax = plt.subplots(nrows=1, ncols=1)
     bin_starts = np.array([0, 0.01, .1, .25, .75, 2, 10]) * 25.4
     outputs.append(hist_data)
-    names.append('Obs')
+    names.append('Wet Years Obs')
     ax.hist(outputs, bins=bin_starts, label=names, density=True, rwidth=.4, log=True)
     plt.xscale("log")
     logfmt = matplotlib.ticker.LogFormatterExponent(base=10.0, labelOnlyBase=True)
     ax.xaxis.set_major_formatter(logfmt)
-    plt.xlabel(r'PRCP ($10^x$ mm/day)')
+    ax.set_xlabel(r'PRCP ($10^x$ mm/day)')
     ax.yaxis.set_major_formatter(logfmt)
-    plt.ylabel(r'Frequency ($10^x$)')
+    ax.set_ylabel(r'Frequency ($10^x$)')
     ax.tick_params(axis='both')
     ax.legend()
     return fig, ax
