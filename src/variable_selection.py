@@ -25,7 +25,7 @@ def select_vars(input_data, target_data, method, labels=None):
 		transformed, most_important, weights = SIR_selection(input_data, target_data)
 	elif method.lower() == 'pca':
 		transformed, most_important = PCA_selection(input_data)
-	elif method.lower() in ['randomforest','rf']:
+	elif method.lower() in ['randomforest', 'rf']:
 		importances, most_important = randomforest_selection(input_data, target_data)
 		transformed = None
 	else:
@@ -52,7 +52,7 @@ def SIR_selection(input_data, target_data, n_components=None):
 		n_components = input_data.shape[-1]
 	sir = sliced.SlicedInverseRegression(n_directions=n_components)
 	sir.fit(input_data, target_data)
-	weights = np.sum((sir.directions_.T * sir.eigenvalues_).T, axis=0)
+	weights = np.abs(np.sum((sir.directions_.T * sir.eigenvalues_).T, axis=0))
 	most_important = [i for i in range(n_components)]
 	sorted_weights, most_important = zip(*sorted(zip(weights, most_important)))
 	output_data = sir.transform(input_data)
@@ -81,14 +81,16 @@ def randomforest_selection(input_data, target_data):
 	importances = rf.feature_importances_
 	most_important = [i for i in range(input_data.shape[-1])]
 	sorted_importances, most_important = zip(*sorted(zip(importances, most_important)))
-	return 	sorted_importances, most_important
+	return sorted_importances, most_important
 
 
 def test_selection():
 	station_id = '725300-94846'
-	downscaling_target = 'max_temp'
-	#downscaling_target = 'precip'
-	input_vars = {'air': [1000, 500], 'rhum': [850], 'uwnd': [700], 'vwnd': [700], 'hgt': [500]}
+	#downscaling_target = 'max_temp'
+	downscaling_target = 'precip'
+	input_vars = {'air': [850, 700, 500, 300], 'rhum': [850, 700, 500, 300],
+				  'uwnd': [850, 700, 500, 300], 'vwnd': [850, 700, 500, 300],
+				  'hgt': [850, 700, 500, 300]}
 	station_data = pd.read_csv('../example/data/stations/' + station_id + '.csv')
 	station_data = station_data.replace(to_replace=[99.99, 9999.9], value=np.nan)
 	reanalysis_data = xarray.open_mfdataset('../example/data/models/*NCEP*')
@@ -125,8 +127,10 @@ def test_selection():
 	for var in input_vars:
 		for level in input_vars[var]:
 			var_data = reanalysis_data.sel(level=level)[var].values
-			var_labels = np.array(
-				[[var + '_' + str(level) + '_' + str(i) + '_' + str(j) for i in range(var_data.shape[2])] for j in range(var_data.shape[1])])
+			#var_labels = np.array(
+				#[[var + '_' + str(level) + '_' + str(i) + '_' + str(j) for i in range(var_data.shape[2])] for j in
+				# range(var_data.shape[1])])
+			var_labels = np.array([[var + '_' + str(level)]])
 			var_labels = var_labels.reshape(1, var_data.shape[1] * var_data.shape[2])
 			var_data = var_data.reshape(var_data.shape[0], var_data.shape[1] * var_data.shape[2])
 			input_data.append(var_data)
