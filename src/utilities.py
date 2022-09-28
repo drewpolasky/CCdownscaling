@@ -98,7 +98,7 @@ def remove_missing(historicalData, climateData):
 
 def generate_dates_list(start_date, end_date, years):
     """
-    generate list of dates between a start and end date for a given span of years
+    generate datetimeIndex of dates between a start and end date for a given span of years
     @param years: list
     @param start_date: str, month/day
     @param end_date: str, month/day
@@ -107,7 +107,7 @@ def generate_dates_list(start_date, end_date, years):
     dates = []
     for year in years:
         dates.extend(pd.date_range(str(year) + '/' + start_date, str(year) + '/' + end_date))
-    return dates
+    return pd.DatetimeIndex(dates)
 
 
 if __name__ == '__main__':

@@ -244,8 +244,8 @@ class som_downscale(object):
 			contours = axis.contourf(plot_zs, levels=np.linspace(minValue, maxValue, 20), cmap=cmap, vmin=minValue,
 									 vmax=maxValue, **kwargs)
 
-		fig.subplots_adjust(right=0.85)
-		cbar_ax = fig.add_axes([0.9, 0.15, 0.02, 0.6])
+		fig.subplots_adjust(right=0.8)
+		cbar_ax = fig.add_axes([0.85, 0.15, 0.02, 0.6])
 		cbar = fig.colorbar(contours, cax=cbar_ax, format=fmt)
 		return fig, axes, cbar
 

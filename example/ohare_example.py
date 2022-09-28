@@ -2,6 +2,7 @@
 # using GSOD station data for Chicago Midway airport
 
 import random
+import warnings
 
 import xarray
 import pandas as pd
@@ -9,18 +10,17 @@ import numpy as np
 import sklearn
 import matplotlib
 import matplotlib.pyplot as plt
-import seaborn as sns
-from statsmodels.tsa.stattools import acf
 
 from src import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, \
-    train_test_splits, climdex
+    train_test_splits, climdex, plotters
 
+warnings.simplefilter(action='ignore', category=FutureWarning)
 # for reproducibility
 seed = 1
 random.seed(seed)
 
 
-def downscale_example(downscaling_target='precip', station_id='725300-94846'):
+def downscale_example(downscaling_target='precip', station_id='725300-94846', split_type='seasonal'):
     # dictionary of variables and pressure levels to use from the reanalysis data
     input_vars = {'air': 850, 'rhum': 850, 'uwnd': 700, 'vwnd': 700, 'hgt': 500}
     station_data = pd.read_csv('./data/stations/' + station_id + '.csv')
@@ -76,23 +76,28 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
     rean_precip = utilities.remove_leap_days(rean_precip, start_year=1976)
     reanalysis_data = utilities.remove_xarray_leap_days(reanalysis_data)
 
-    # split train and test sets:
+    # Section 2: Splitting the train and test sets
+    # This section has three options for splitting the data: simple, seasonal, and percentile
     dates = reanalysis_data['time']
     hist_data = xarray.DataArray(data=hist_data, dims=['time'], coords={'time': dates})
     rean_precip = xarray.DataArray(data=rean_precip, dims=['time'], coords={'time': dates})
+
     # with a simple split:
-    train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
-        reanalysis_data, hist_data, rean_precip)
+    if split_type == 'simple':
+        train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
+            reanalysis_data, hist_data, rean_precip)
 
     # selecting the highest precip/temperature years:
-    train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_max_target_years(
-       reanalysis_data, hist_data, 'max', time_period='year', split=0.8, rean_data=rean_precip)
+    elif split_type == 'percentile':
+        train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_max_target_years(
+            reanalysis_data, hist_data, 'max', time_period='year', split=0.8, rean_data=rean_precip)
 
     # training on the spring, testing on the summer:
-    train_dates = utilities.generate_dates_list('3/1', '5/31', list(range(1976, 2006)))
-    test_dates = utilities.generate_dates_list('6/1', '8/31', list(range(1976, 2006)))
-    #train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_season_train_test(
-    #	reanalysis_data, hist_data, train_dates, test_dates, rean_data=rean_precip)
+    elif split_type == 'seasonal':
+        train_dates = utilities.generate_dates_list('3/1', '5/31', list(range(1976, 2006)))
+        test_dates = utilities.generate_dates_list('6/1', '8/31', list(range(1976, 2006)))
+        train_data, test_data, train_hist, test_hist, rean_precip_train, rean_precip_test = train_test_splits.select_season_train_test(
+            reanalysis_data, hist_data, train_dates, test_dates, rean_data=rean_precip)
 
     input_train_data = []
     input_test_data = []
@@ -163,13 +168,17 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
 
     # first, the som specific plots
     freq, avg, dry = som.node_stats()
-    ax = som.heat_map(train_data, annot=avg)
+    ax = som.heat_map(train_data, annot=avg, linewidths=1, linecolor='white')
     plt.yticks(rotation=0)
-    plt.savefig('example_figures/ohare_heatmap_highSplit_5x7_' + downscaling_target + '.png')
-    # plt.show()
+    plt.savefig('example_figures/ohare_heatmap_'+split_type+'_5x7_' + downscaling_target + '.png')
+    #plt.show()
     plt.close()
+
     i = 0
     index_range = (window * 2 + 1) ** 2
+    font = {'size': 14}
+    matplotlib.rc('font', **font)
+
     for var in input_vars:
         start_index = i * index_range
         end_index = (i + 1) * index_range
@@ -180,14 +189,14 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
             axis.set_yticks([])
 
         for axis, col in zip(ax[-1], range(0, som.som_x)):
-            axis.set_xlabel(col, size='large')
+            axis.set_xlabel(col,fontsize=14)
         for axis, row in zip(ax[:, 0], range(0, som.som_y)):
-            axis.set_ylabel(row, rotation=0, size='large')
+            axis.set_ylabel(row, rotation=0, fontsize=14)
         # fig.suptitle(var)
         units = {'air': '(K)', 'rhum': '(%)', 'uwnd': r'(ms$^{-1}$)', 'vwnd': r'(ms$^{-1}$)', 'hgt': '(m)'}
-        cbar.set_label(var.capitalize() + ' ' + units[var], rotation='horizontal', labelpad=20)
-        fig.savefig('example_figures/SOM_nodes_highSplit_NCEP_' + var + '.png')
-        # plt.show()
+        cbar.set_label(var.capitalize() + ' ' + units[var], rotation='vertical', labelpad=20, fontsize=14)
+        fig.savefig('example_figures/SOM_nodes_'+split_type+'_NCEP_' + var + '.png')
+        plt.show()
         plt.close()
         i += 1
 
@@ -207,16 +216,16 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
         i += 1
 
     # finally, some plots comparing the outputs
-    fig, ax = plot_kde(outputs, names, test_hist, scores, downscaling_target)
-    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_kde.png')
+    fig, ax = plotters.plot_kde(outputs, names, test_hist, scores, downscaling_target)
+    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_kde.png')
     #plt.show()
 
-    fig, ax = plot_autocorrelation(outputs, names, test_hist)
-    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_autocorr.png')
+    fig, ax = plotters.plot_autocorrelation(outputs, names, test_hist)
+    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_autocorr.png')
     #plt.show()
 
-    fig, ax = plot_histogram(outputs, names, test_hist)
-    plt.savefig('example_figures/ohare_maxYears_highSplit_' + downscaling_target + '_methods_compare_histogram.png')
+    fig, ax = plotters.plot_histogram(outputs, names, test_hist)
+    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_histogram.png')
     #plt.show()
     plt.close('all')
 
@@ -226,73 +235,29 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846'):
         print(names[i])
         climdex.print_indices(climdex_values, func_list)
 
-    fig, axes = plt.subplots(1,3, figsize=(15,8), sharex=True, sharey=True)
-    outputs = [[som_train_output, som_output, train_hist],[random_forest_train_output, random_forest_output, train_hist],[qmap_train_output, qmap_output, train_hist]]
-    names = [['SOM train', 'SOM wet years', 'Train Obs'],['RF train', 'RF wet years', 'Train Obs'],['QMAP train', 'QMAP wet years','Train Obs']]
+    fig, axes = plt.subplots(1,3, figsize=(10,5), sharex=True, sharey=True)
+    outputs = [[som_train_output, som_output, train_hist], [random_forest_train_output, random_forest_output, train_hist], [qmap_train_output, qmap_output, train_hist]]
+    names = [['SOM train', 'SOM wet years', 'Train Obs'], ['RF train', 'RF wet years', 'Train Obs'], ['QMAP train', 'QMAP wet years','Train Obs']]
     i = 0
-    letters = ['a)','b)','c)']
     for axis in axes:
         for j in range(len(outputs[i])):
             print(round(np.mean(outputs[i][j]), 2), names[i][j])
-        plot_histogram(outputs[i], names[i], test_hist, downscaling_target=downscaling_target, ax=axis, fig=fig)
+        if i == 0:
+            y_label = True
+        else:
+            y_label = False
+        fig, axis = plotters.plot_histogram(outputs[i], names[i], test_hist, downscaling_target=downscaling_target, ax=axis, fig=fig, y_label=y_label)
+        i += 1
+
+    i = 0
+    letters = ['a)', 'b)', 'c)']
+    for axis in axes:
         axis.text(axis.get_xlim()[0], axis.get_ylim()[1] + 0.002, letters[i])
-        i+=1
-    plt.savefig('example_figures/ohare_maxYears_trainTest_'+downscaling_target+'_methods_compare_histogram3panel.png')
+        i += 1
+
+    plt.savefig('example_figures/ohare_'+split_type+'_trainTest_'+downscaling_target+'_methods_compare_histogram3panel.png')
     plt.show()
 
 
-def plot_kde(outputs, names, hist_data, scores=None, downscaling_target=None, ax=None, fig=None):
-    i = 0
-    if ax is None:
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-    for output in outputs:
-        if scores is not None:
-            sns.kdeplot(output, label=names[i] + ' ' + str(scores[names[i]][0]), ax=ax)
-        else:
-            sns.kdeplot(output, label=names[i], ax=ax)
-        i += 1
-    sns.kdeplot(hist_data, color='k', lw=2.0, label='Obs', ax=ax)
-    if downscaling_target == 'max_temp':
-        plt.xlabel(r'Daily Max Temperature ($^\circ$C)')
-    elif downscaling_target == 'precip':
-        plt.xlabel(r'PRCP ($10^x$ mm/day)')
-    return fig, ax
-
-
-def plot_histogram(outputs, names, hist_data, fig = None, ax = None, downscaling_target=None):
-    if ax is None:
-        fig, ax = plt.subplots(nrows=1, ncols=1)
-    bin_starts = np.array([0, 0.01, .1, .25, .75, 2, 10]) * 25.4
-    outputs.append(hist_data)
-    names.append('Wet Years Obs')
-    ax.hist(outputs, bins=bin_starts, label=names, density=True, rwidth=.4, log=True)
-    plt.xscale("log")
-    logfmt = matplotlib.ticker.LogFormatterExponent(base=10.0, labelOnlyBase=True)
-    ax.xaxis.set_major_formatter(logfmt)
-    ax.set_xlabel(r'PRCP ($10^x$ mm/day)')
-    ax.yaxis.set_major_formatter(logfmt)
-    ax.set_ylabel(r'Frequency ($10^x$)')
-    ax.tick_params(axis='both')
-    ax.legend()
-    return fig, ax
-
-
-def plot_autocorrelation(outputs, names, hist_data, nlags=10):
-    # plot the autocorrelation function for the different downscaling outputs.
-    fig, ax = plt.subplots(nrows=1, ncols=1)
-    i = 0
-    for output in outputs:
-        auto_corr = acf(output, nlags=nlags)
-        ax.plot(auto_corr, label=names[i])
-        i += 1
-
-    obs_corr = acf(hist_data, nlags=nlags)
-    ax.plot(obs_corr, label='Obs', color='k')
-    ax.set_xlabel('Lag Time (days)')
-    ax.set_ylabel('Correlation')
-    ax.legend(ncol=2)
-    return fig, ax
-
-
 if __name__ == '__main__':
-    downscale_example(downscaling_target='max_temp')
+    downscale_example(downscaling_target='precip')
