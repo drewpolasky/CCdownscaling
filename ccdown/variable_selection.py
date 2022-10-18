@@ -8,7 +8,7 @@ import numpy as np
 from sklearn import decomposition
 import sliced
 
-from src import utilities
+from ccdown import utilities
 
 
 def select_vars(input_data, target_data, method, labels=None):

@@ -1,6 +1,6 @@
 # This is an example usage of the downscaling package,
 # using GSOD station data for Chicago Midway airport
-
+import argparse
 import random
 import warnings
 
@@ -11,7 +11,7 @@ import sklearn
 import matplotlib
 import matplotlib.pyplot as plt
 
-from src import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, \
+from ccdown import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, \
     train_test_splits, climdex, plotters
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
@@ -20,7 +20,7 @@ seed = 1
 random.seed(seed)
 
 
-def downscale_example(downscaling_target='precip', station_id='725300-94846', split_type='seasonal'):
+def downscale_example(downscaling_target='precip', station_id='725300-94846', split_type='percentile'):
     # dictionary of variables and pressure levels to use from the reanalysis data
     input_vars = {'air': 850, 'rhum': 850, 'uwnd': 700, 'vwnd': 700, 'hgt': 500}
     station_data = pd.read_csv('./data/stations/' + station_id + '.csv')
@@ -53,9 +53,6 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     date_mask = ((station_data['time'] >= start) & (station_data['time'] <= end))
     station_data = station_data[date_mask]
 
-    # Identify the most important variables, and do dimension reduction, if desired
-    ##TODO
-
     hist_data = station_data[downscaling_target].values
     # Convert units, F to C for temperature, in/day to mm/day for precip
     if downscaling_target == 'max_temp':
@@ -85,7 +82,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     # with a simple split:
     if split_type == 'simple':
         train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
-            reanalysis_data, hist_data, rean_precip)
+            reanalysis_data, hist_data, rean_precip, split=0.8)
 
     # selecting the highest precip/temperature years:
     elif split_type == 'percentile':
@@ -131,7 +128,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     print(np.nanpercentile(test_hist, 90))
 
     # initialize the different methods
-    som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)
+    som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)#, node_model_type='random_forest')
     rf_two_part = correction_downscale_methods.two_step_random_forest()
     random_forest = sklearn.ensemble.RandomForestRegressor()
     qmap = correction_downscale_methods.quantile_mapping()
@@ -196,7 +193,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         units = {'air': '(K)', 'rhum': '(%)', 'uwnd': r'(ms$^{-1}$)', 'vwnd': r'(ms$^{-1}$)', 'hgt': '(m)'}
         cbar.set_label(var.capitalize() + ' ' + units[var], rotation='vertical', labelpad=20, fontsize=14)
         fig.savefig('example_figures/SOM_nodes_'+split_type+'_NCEP_' + var + '.png')
-        plt.show()
+        #plt.show()
         plt.close()
         i += 1
 
@@ -260,4 +257,9 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
 
 if __name__ == '__main__':
-    downscale_example(downscaling_target='precip')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--target', type=str, default='precip')
+    parser.add_argument('--split', type=str, default='simple')
+    parser.add_argument('--station', type=str, default = '725300-94846')
+    args = parser.parse_args()
+    downscale_example(downscaling_target=args.target, split_type=args.split, station_id=args.station)

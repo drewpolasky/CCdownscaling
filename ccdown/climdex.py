@@ -4,7 +4,7 @@ import pandas as pd
 import xarray
 
 from simple_pyclimdex.src import prcp, max_temp, min_temp
-from src import utilities
+from ccdown import utilities
 
 def print_indices(outputs, func_list):
 	"""

@@ -3,6 +3,8 @@ import time
 import random
 import math
 import pickle
+import warnings
+warnings.simplefilter(action='ignore', category=FutureWarning)
 
 import numpy as np
 import tensorflow as tf
@@ -13,11 +15,11 @@ from matplotlib import cm
 import matplotlib.pyplot as plt
 import sklearn.ensemble
 
-from src.tensorflow_som.tf_som import SelfOrganizingMap as SOM
+from ccdown.tensorflow_som.tf_som import SelfOrganizingMap as SOM
 
 
 class som_downscale(object):
-	def __init__(self, som_x, som_y, batch, alpha, epochs, num_procs=1):
+	def __init__(self, som_x, som_y, batch, alpha, epochs, num_procs=1, node_model_type='random'):
 		self.epochs = epochs
 		self.som_x = som_x
 		self.som_y = som_y
@@ -25,7 +27,7 @@ class som_downscale(object):
 		self.alpha = alpha
 		self.num_procs = num_procs
 		self.clusters = {}
-		self.node_model_type = 'random'
+		self.node_model_type = node_model_type
 		self.node_models = []
 
 	def fit(self, model_timeseries, obs_timeseries, seed=1):
@@ -156,7 +158,7 @@ class som_downscale(object):
 		one the days that fall on that som node, and use that to generate the day observations
 		"""
 		day_model = self.node_models[index]
-		day_value = day_model.predict(day_vector)
+		day_value = day_model.predict(day_vector.reshape(1,-1))
 		return day_value
 
 	def quantization_error(self, model_timeseries):
@@ -294,19 +296,17 @@ def test_som():
 	test_data = np.random.normal(3, 4, size=(10000, 25))
 	test_obs = np.random.normal(3, 4, size=(10000))
 
-	som = som_downscale(3, 5, 128, 0.01, 25)
-	som.map(train_data)
-	som.fit_pdfs(train_data, train_obs)
+	som = som_downscale(3, 5, 128, 0.01, 25, node_model_type='random_forest')
+	som.fit(train_data, train_obs)
 	print(som.output_weights.shape)
 	predicted = som.predict(test_data)
 	print(predicted.shape)
 	print(som.node_stats())
 
-
-# ax = som.heat_map(train_data, annot=True)
-# plt.show()
-# fig, ax = som.plot_nodes()
-# plt.show()
+	ax = som.heat_map(train_data, annot=True)
+	plt.show()
+	fig = som.plot_nodes()
+	plt.show()
 
 if __name__ == '__main__':
 	test_som()
