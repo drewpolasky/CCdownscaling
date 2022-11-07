@@ -35,5 +35,3 @@ and split_type (simple, percentile, seasonal):
 ```bash
 python ohare_example.py
 ```
-
-There is also a 
