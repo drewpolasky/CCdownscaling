@@ -12,7 +12,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 
 from ccdown import correction_downscale_methods, distribution_tests, error_metrics, som_downscale, utilities, \
-    train_test_splits, climdex, plotters
+    train_test_splits, climdex, plotters, variable_selection
 
 warnings.simplefilter(action='ignore', category=FutureWarning)
 # for reproducibility
@@ -73,6 +73,12 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     rean_precip = utilities.remove_leap_days(rean_precip, start_year=1976)
     reanalysis_data = utilities.remove_xarray_leap_days(reanalysis_data)
 
+    #Run the variable selection code
+    #input_data, labels = variable_selection.organize_labeled_data(input_vars, reanalysis_data, window=window)
+    #variable_selection.select_vars(input_data, hist_data, method='SIR', labels=labels)
+    #variable_selection.select_vars(input_data, hist_data, method='PCA', labels=labels)
+    #variable_selection.select_vars(input_data, hist_data, method='RF', labels=labels)
+
     # Section 2: Splitting the train and test sets
     # This section has three options for splitting the data: simple, seasonal, and percentile
     dates = reanalysis_data['time']
@@ -128,7 +134,8 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     print(np.nanpercentile(test_hist, 90))
 
     # initialize the different methods
-    som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)#, node_model_type='random_forest')
+    som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)
+    som_rf = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50, node_model_type='random_forest')
     rf_two_part = correction_downscale_methods.two_step_random_forest()
     random_forest = sklearn.ensemble.RandomForestRegressor()
     qmap = correction_downscale_methods.quantile_mapping()
@@ -136,6 +143,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
     # train
     som.fit(train_data, train_hist, seed=1)
+    som_rf.fit(train_data, train_hist, seed=1)
     random_forest.fit(train_data, train_hist)
     rf_two_part.fit(train_data, train_hist)
     linear.fit(train_data, train_hist)
@@ -143,6 +151,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
     # generate outputs from the test data
     som_output = som.predict(test_data)
+    som_rf_output = som.predict(test_data)
     random_forest_output = random_forest.predict(test_data)
     rf_two_part_output = rf_two_part.predict(test_data)
     linear_output = linear.predict(test_data)
@@ -150,19 +159,17 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
     # generate outputs from the train data for comparision
     som_train_output = som.predict(train_data)
+    som_rf_train_output = som.predict(train_data)
     random_forest_train_output = random_forest.predict(train_data)
     rf_two_part_train_output = rf_two_part.predict(train_data)
     linear_train_output = linear.predict(train_data)
     qmap_train_output = qmap.predict(rean_precip_train)
 
     # Include the reanalysis precipitation as an undownscaled comparison
-    names = ['SOM', 'Random Forest', 'RF Two Part', 'Linear', 'Qmap', 'NCEP']
-    outputs = [som_output, random_forest_output, rf_two_part_output, linear_output, qmap_output, rean_precip_test]
+    names = ['SOM', "SOM_RF", 'Random Forest', 'RF Two Part', 'Linear', 'Qmap', 'NCEP']
+    outputs = [som_output, som_rf_output, random_forest_output, rf_two_part_output, linear_output, qmap_output, rean_precip_test]
 
-    # names = ['SOM','Random Forest','NCEP']
-    # outputs = [som_output, random_forest_output, rean_precip]
     # run analyses for the downscaled outputs
-
     # first, the som specific plots
     freq, avg, dry = som.node_stats()
     ax = som.heat_map(train_data, annot=avg, linewidths=1, linecolor='white')
@@ -214,16 +221,17 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
     # finally, some plots comparing the outputs
     fig, ax = plotters.plot_kde(outputs, names, test_hist, scores, downscaling_target)
-    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_kde.png')
-    #plt.show()
+    plt.legend()
+    plt.savefig('example_figures/ohare_'+split_type+'_' + downscaling_target + '_methods_compare_kde.png')
+    plt.show()
 
     fig, ax = plotters.plot_autocorrelation(outputs, names, test_hist)
-    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_autocorr.png')
-    #plt.show()
+    plt.savefig('example_figures/ohare_'+split_type+'_' + downscaling_target + '_methods_compare_autocorr.png')
+    plt.show()
 
     fig, ax = plotters.plot_histogram(outputs, names, test_hist)
-    plt.savefig('example_figures/ohare_maxYears_'+split_type+'_' + downscaling_target + '_methods_compare_histogram.png')
-    #plt.show()
+    plt.savefig('example_figures/ohare_'+split_type+'_' + downscaling_target + '_methods_compare_histogram.png')
+    plt.show()
     plt.close('all')
 
     for i in range(len(outputs)):
@@ -260,6 +268,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--target', type=str, default='precip')
     parser.add_argument('--split', type=str, default='simple')
-    parser.add_argument('--station', type=str, default = '725300-94846')
+    parser.add_argument('--station', type=str, default='725300-94846')
     args = parser.parse_args()
     downscale_example(downscaling_target=args.target, split_type=args.split, station_id=args.station)

@@ -14,10 +14,10 @@ from ccdown import utilities
 def select_vars(input_data, target_data, method, labels=None):
 	"""
 	Wrapper function for variable selection methods
-	@param input_data:
-	@param target_data:
-	@param method:
-	@param labels:
+	@param input_data: array, uses the same format as inputs to the downscaling methods
+	@param target_data: target_data: 1-D array
+	@param method: string, implemented methods are: sir, pca, randomforest
+	@param labels: names of the input variables. Should match the shape of input_data[0]
 	@return:
 	"""
 
@@ -43,9 +43,9 @@ def select_vars(input_data, target_data, method, labels=None):
 def SIR_selection(input_data, target_data, n_components=None):
 	"""
 	Rank variables and dimension reduce using Sliced Inverse Regression
-	@param input_data:
-	@param target_data:
-	@param n_components:
+	@param input_data: array, uses the same format as inputs to the downscaling methods
+	@param n_components: number of components to calculate. Defaults to the number of variables in the input data
+	@param target_data: target_data: 1-D array
 	@return:
 	"""
 	if n_components is None:
@@ -62,8 +62,8 @@ def SIR_selection(input_data, target_data, n_components=None):
 def PCA_selection(input_data, n_components=None):
 	"""
 	Rank variables and dimension reduce using Principal Component Analysis
-	@param input_data:
-	@param n_components:
+	@param input_data: array, uses the same format as inputs to the downscaling methods
+	@param n_components: number of components to calculate. Defaults to the number of variables in the input data
 	@return:
 	"""
 	if n_components is None:
@@ -76,6 +76,12 @@ def PCA_selection(input_data, n_components=None):
 
 
 def randomforest_selection(input_data, target_data):
+	"""
+	Rank variables using the sklearn impurity-based variable importance for random forest.
+	@param input_data: array, uses the same format as inputs to the downscaling methods
+	@param target_data: 1-D array
+	@return:
+	"""
 	rf = sklearn.ensemble.RandomForestRegressor()
 	rf.fit(input_data, target_data)
 	importances = rf.feature_importances_
@@ -84,9 +90,33 @@ def randomforest_selection(input_data, target_data):
 	return sorted_importances, most_important
 
 
+def organize_labeled_data(input_vars, reanalysis_data, window=0):
+	# simple function to generate a list of the names of the input variables
+	input_data = []
+	labels = []
+	for var in input_vars:
+		if type(input_vars[var]) is not list:
+			input_vars[var] = [input_vars[var]]
+		for level in input_vars[var]:
+			var_data = reanalysis_data.sel(level=level)[var].values
+			if window != 0:
+				var_labels = np.array([[var + '_' + str(level) + '_' + str(i) + '_' + str(j) for i in range(-window, window+1)] for j in range(-window, window+1)])
+			else:
+				var_labels = np.array([[var + '_' + str(level)]])
+			var_labels = var_labels.reshape(1, var_data.shape[1] * var_data.shape[2])
+			var_data = var_data.reshape(var_data.shape[0], var_data.shape[1] * var_data.shape[2])
+			input_data.append(var_data)
+			labels.append(var_labels)
+	input_data = np.concatenate(input_data, axis=1)
+	input_data = np.array(input_data)
+	labels = np.array(labels)
+	labels = np.concatenate(labels, axis=1).squeeze()
+	return input_data, labels
+
+
 def test_selection():
+	#Test case for the variable selection code using the o'hare example
 	station_id = '725300-94846'
-	#downscaling_target = 'max_temp'
 	downscaling_target = 'precip'
 	input_vars = {'air': [850, 700, 500, 300], 'rhum': [850, 700, 500, 300],
 				  'uwnd': [850, 700, 500, 300], 'vwnd': [850, 700, 500, 300],
@@ -122,28 +152,12 @@ def test_selection():
 	reanalysis_data = reanalysis_data.isel({'lat': slice(lat_index - window, lat_index + window + 1),
 											'lon': slice(lon_index - window, lon_index + window + 1)})
 
-	input_data = []
-	labels = []
-	for var in input_vars:
-		for level in input_vars[var]:
-			var_data = reanalysis_data.sel(level=level)[var].values
-			#var_labels = np.array(
-				#[[var + '_' + str(level) + '_' + str(i) + '_' + str(j) for i in range(var_data.shape[2])] for j in
-				# range(var_data.shape[1])])
-			var_labels = np.array([[var + '_' + str(level)]])
-			var_labels = var_labels.reshape(1, var_data.shape[1] * var_data.shape[2])
-			var_data = var_data.reshape(var_data.shape[0], var_data.shape[1] * var_data.shape[2])
-			input_data.append(var_data)
-			labels.append(var_labels)
-	input_data = np.concatenate(input_data, axis=1)
-	input_data = np.array(input_data)
-	labels = np.array(labels)
-	labels = np.concatenate(labels, axis=1).squeeze()
-
+	input_data, labels = organize_labeled_data(input_vars, reanalysis_data)
 	# Drop days with NaN values for the observation:
 	hist_data, input_data = utilities.remove_missing(hist_data, input_data)
 	input_data, input_means, input_stdevs = utilities.normalize_climate_data(input_data)
 
+	# Run each of the variable selection methods for comparison
 	select_vars(input_data, hist_data, method='SIR', labels=labels)
 	select_vars(input_data, hist_data, method='PCA', labels=labels)
 	select_vars(input_data, hist_data, method='RF', labels=labels)
