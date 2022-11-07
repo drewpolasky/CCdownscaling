@@ -1,0 +1,3 @@
+[submodule "simple_pyclimdex"]
+	path = simple_pyclimdex
+	url = https://github.com/drewpolasky/simple_pyclimdex

@@ -4,9 +4,10 @@ import sys
 import xarray
 import pandas as pd
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
-from src import som_downscale, utilities
+from ccdown import som_downscale, utilities
 
 
 def som_size_selection(downscaling_target='precip', station_id='725300-94846'):
@@ -86,21 +87,26 @@ def som_size_selection(downscaling_target='precip', station_id='725300-94846'):
 	quant_errors = []
 	topo_errors = []
 	for size in sizes:
-		som = som_downscale.som_downscale(som_x=size[0], som_y=size[1], batch=512, alpha=0.1, epochs=50)
+		som = som_downscale.som_downscale(som_x=size[0], som_y=size[1], batch=512, alpha=0.1, epochs=50)#, node_model_type='random_forest')
 		som.fit(training_data, train_hist, seed=1)
 		quant_errors.append(som.quantization_error(training_data))
 		topo_errors.append(som.topograpical_error(training_data))
 
+	fig, ax = plt.subplots()
 	size_names = [str(size[0]) + 'x' + str(size[1]) for size in sizes]
-	plt.plot(size_names, quant_errors)
+	ax.plot(size_names, quant_errors)
+	#ax.set_yticks([5,6,7,8])
+	ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 	plt.xlabel('SOM size')
 	plt.ylabel('Quantization Error')
 	plt.savefig('./example_figures/quant_errors_sizes.png')
 	plt.show()
 
-	plt.plot(size_names, topo_errors)
+	fig, ax = plt.subplots()
+	ax.plot(size_names, topo_errors)
 	plt.xlabel('SOM size')
 	plt.ylabel('Topograpical Error')
+	ax.yaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter('%.1f'))
 	plt.savefig('./example_figures/topo_errors_sizes.png')
 	plt.show()
 
