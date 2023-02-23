@@ -35,5 +35,4 @@ and split_type (simple, percentile, seasonal):
 ```bash
 python ohare_example.py
 ```
-
-There is also a 
+There is also a jupyter notebook with the same example included in the example folder. 
