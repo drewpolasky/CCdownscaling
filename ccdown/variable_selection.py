@@ -117,10 +117,10 @@ def organize_labeled_data(input_vars, reanalysis_data, window=0):
 def test_selection():
 	#Test case for the variable selection code using the o'hare example
 	station_id = '725300-94846'
-	downscaling_target = 'precip'
-	input_vars = {'air': [850, 700, 500, 300], 'rhum': [850, 700, 500, 300],
-				  'uwnd': [850, 700, 500, 300], 'vwnd': [850, 700, 500, 300],
-				  'hgt': [850, 700, 500, 300]}
+	downscaling_target = 'max_temp'
+	input_vars = {'air': [1000, 850, 700, 600, 500, 300], 'rhum': [1000, 850, 700, 600, 500, 300],
+				  'uwnd': [1000, 850, 700, 600, 500, 300], 'vwnd': [1000, 850, 700, 600, 500, 300],
+				  'hgt': [1000, 850, 700, 600, 500, 300]}
 	station_data = pd.read_csv('../example/data/stations/' + station_id + '.csv')
 	station_data = station_data.replace(to_replace=[99.99, 9999.9], value=np.nan)
 	reanalysis_data = xarray.open_mfdataset('../example/data/models/*NCEP*')
@@ -156,7 +156,6 @@ def test_selection():
 	# Drop days with NaN values for the observation:
 	hist_data, input_data = utilities.remove_missing(hist_data, input_data)
 	input_data, input_means, input_stdevs = utilities.normalize_climate_data(input_data)
-
 	# Run each of the variable selection methods for comparison
 	select_vars(input_data, hist_data, method='SIR', labels=labels)
 	select_vars(input_data, hist_data, method='PCA', labels=labels)

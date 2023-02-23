@@ -1,6 +1,7 @@
 # Methods to set up alternate train/test splits, for testing the downscaling
 # methods on different climates than they were trained on.
 
+import random
 import numpy as np
 import pandas as pd
 import xarray
@@ -85,6 +86,54 @@ def select_season_train_test(x_data, y_data, train_dates, test_dates, rean_data=
 		return x_train, x_test, y_train, y_test
 
 
+def cross_validation_sets(x_data, y_data, rean_y=None, split=0.8, num_sets=10, split_by_year=True):
+	"""
+	This split version returns multiple train/test sets
+	@param x_data:
+	@param y_data:
+	@param rean_y:
+	@param split: percentage for the training set
+	@param num_sets: How many cross validation train/test splits to include
+	@param split_by_year: whether to use full years in the split, or divide the data fully randomly
+	@return: train and tests sets as a list of arrays
+	"""
+	train_x = []
+	train_y = []
+	test_x = []
+	test_y = []
+	rean_train = []
+	rean_test = []
+	for i in range(num_sets):
+		if split_by_year:
+			allyears = list(set(x_data['time'].dt.year.values))
+			split_value = int(split * len(allyears))
+			random.shuffle(allyears)
+			train_periods = allyears[:split_value]
+			test_periods = allyears[split_value:]
+			train_x.append(x_data.sel(time=(x_data.time.dt.year.isin(train_periods))))
+			test_x.append(x_data.sel(time=(x_data.time.dt.year.isin(test_periods))))
+			train_x.append(y_data.sel(time=(y_data.time.dt.year.isin(train_periods))))
+			test_x.append(y_data.sel(time=(y_data.time.dt.year.isin(test_periods))))
+			if rean_y is not None:
+				rean_train.append(rean_y.sel(time=(rean_y.time.dt.year.isin(train_periods))))
+				rean_test.append(rean_y.sel(time=(rean_y.time.dt.year.isin(test_periods))))
+		else:
+			all_dates = list(x_data['time'].values)
+			train_dates = random.sample(all_dates, int(len(all_dates)*split))
+			test_dates = list(set(all_dates) - set(train_dates))
+			train_x.append(x_data.sel(time=train_dates))
+			train_y.append(y_data.sel(time=train_dates))
+			test_x.append(x_data.sel(time=test_dates))
+			test_y.append(y_data.sel(time=test_dates))
+			if rean_y is not None:
+				rean_train.append(rean_y.sel(time=train_dates))
+				rean_test.append(rean_y.sel(time=test_dates))
+
+	if rean_y is not None:
+		return train_x, train_y, test_x, test_y, rean_train, rean_test
+	else:
+		return train_x, train_y, test_x, test_y
+
 def test_train_test_splits():
 	station_id = '725300-94846'
 	downscaling_target = 'max_temp'
@@ -130,10 +179,14 @@ def test_train_test_splits():
 	#print(train_data, test_data)
 
 	# season select
-	train_dates = utilities.generate_dates_list('3/1', '5/31', list(range(1976, 2006)))
-	test_dates = utilities.generate_dates_list('6/1', '8/31', list(range(1976, 2006)))
-	train_data, test_data, train_hist, test_hist = select_season_train_test(reanalysis_data, hist_data, train_dates,
-																			test_dates)
+	#train_dates = utilities.generate_dates_list('3/1', '5/31', list(range(1976, 2006)))
+	#test_dates = utilities.generate_dates_list('6/1', '8/31', list(range(1976, 2006)))
+	#train_data, test_data, train_hist, test_hist = select_season_train_test(reanalysis_data, hist_data, train_dates,
+	#																		test_dates)
+
+	train_data, train_hist, test_data, test_hist = cross_validation_sets(
+		reanalysis_data, hist_data, split=0.8, split_by_year=True, num_sets=5)
+
 	print(train_data)
 	print(test_data)
 

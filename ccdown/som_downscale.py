@@ -45,7 +45,6 @@ class som_downscale(object):
 	def map(self, model_timeseries, seed=1):
 		graph = tf.Graph()
 		with graph.as_default():
-			tf.set_random_seed(seed)
 			session = tf.compat.v1.Session(config=tf.compat.v1.ConfigProto(
 				allow_soft_placement=True,
 				log_device_placement=False,
@@ -200,7 +199,7 @@ class som_downscale(object):
 			return False
 
 	def plot_nodes(self, weights_index=None, size_x=None, size_y=None, stdevs=None, means=None,
-				   fmt=matplotlib.ticker.FormatStrFormatter('%.0f'), cmap=cm.gist_ncar, **kwargs):
+				   fmt=matplotlib.ticker.FormatStrFormatter('%.0f'), cmap=cm.gist_ncar, var = None, **kwargs):
 		"""
 		plots the grid of SOM nodes, with contours for a selected range of weights, intended to correspond to a single
 		variable over a spatial window.
@@ -230,7 +229,8 @@ class som_downscale(object):
 					zs[loc].append(plot_weights[j][i] * stdevs[i] + means[i])
 				else:
 					zs[loc].append(plot_weights[j][i])
-
+			#if var == 'air':
+			#	zs[loc] = np.array(zs[loc]) - 273.15
 		minValue = np.min(list(zs.values()))
 		maxValue = np.max(list(zs.values()))
 
@@ -243,6 +243,7 @@ class som_downscale(object):
 			loc = (j // n, j % n)
 			plot_zs = np.array(zs[loc]).reshape(size_x, size_y)
 			axis = axes[loc[0], loc[1]]
+			print(plot_zs)
 			contours = axis.contourf(plot_zs, levels=np.linspace(minValue, maxValue, 20), cmap=cmap, vmin=minValue,
 									 vmax=maxValue, **kwargs)
 

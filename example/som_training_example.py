@@ -86,11 +86,13 @@ def som_size_selection(downscaling_target='precip', station_id='725300-94846'):
 	sizes = [[2, 3], [3, 4], [4, 5], [5, 7], [6, 8], [7, 9], [9, 11], [11, 13], [13, 15]]
 	quant_errors = []
 	topo_errors = []
+	aic = []
 	for size in sizes:
 		som = som_downscale.som_downscale(som_x=size[0], som_y=size[1], batch=512, alpha=0.1, epochs=50)#, node_model_type='random_forest')
 		som.fit(training_data, train_hist, seed=1)
 		quant_errors.append(som.quantization_error(training_data))
 		topo_errors.append(som.topograpical_error(training_data))
+		aic.append(som.AIC(training_data))
 
 	fig, ax = plt.subplots()
 	size_names = [str(size[0]) + 'x' + str(size[1]) for size in sizes]

@@ -8,3 +8,5 @@ example/example_figures/*
 *.pyc
 example/*.pyc
 .idea/*
+example/Untitled*
+example/.ipynb_checkpoints/*
