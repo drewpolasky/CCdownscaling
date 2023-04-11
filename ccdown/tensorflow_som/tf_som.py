@@ -132,7 +132,7 @@ class SelfOrganizingMap:
         We are assuming that if it's loaded then it's already trained.
         """
         if self._saver is None:
-            self._saver = tf.train.Saver()
+            self._saver = tf.compat.v1.train.Saver()
 
         if self._restore_path is not None:
             logging.info("Restoring variables from checkpoint file {}".format(self._restore_path))
@@ -152,12 +152,12 @@ class SelfOrganizingMap:
         In multi-gpu mode it will duplicate the model across the GPUs and use the CPU to calculate the final
         weight updates.
         """
-        with self._graph.as_default(), tf.variable_scope(tf.get_variable_scope()), tf.device('/cpu:0'):
+        with self._graph.as_default(), tf.compat.v1.variable_scope(tf.compat.v1.get_variable_scope()), tf.device('/cpu:0'):
             # This list will contain the handles to the numerator and denominator tensors for each of the towers
             tower_updates = list()
             # This is used by all of the towers and needs to be fed to the graph, so let's put it here
             with tf.name_scope('Iteration'):
-                self._iter_input = tf.placeholder("float", [], name="iter")
+                self._iter_input = tf.compat.v1.placeholder("float", [], name="iter")
             if self._gpus > 0:
                 for i in range(self._gpus):
                     # We only want the summaries of the last tower, so wipe it out each time
@@ -176,7 +176,7 @@ class SelfOrganizingMap:
                 #There might be a way to alter this for running on multiple nodes, creating multiple towers as is done for the multiple gpu case.
                 with tf.name_scope("Tower_0") as scope:
                     tower_updates.append(self._tower_som())
-                    tf.get_variable_scope().reuse_variables()
+                    tf.compat.v1.get_variable_scope().reuse_variables()
                     self._activity_op = self._make_activity_op(self._input_tensor)
 
             with tf.name_scope("Weight_Update"):
@@ -188,7 +188,7 @@ class SelfOrganizingMap:
                 # Divide them
                 new_weights = tf.divide(numerators, denominators)
                 # Assign them
-                self._training_op = tf.assign(self._weights, new_weights)
+                self._training_op = tf.compat.v1.assign(self._weights, new_weights)
 
     def _tower_som(self):
         """ Build a single SOM tower on the TensorFlow graph """
@@ -197,7 +197,7 @@ class SelfOrganizingMap:
         with tf.name_scope('Weights'):
             # Each tower will get its own copy of the weights variable. Since the towers are constructed sequentially,
             # the handle to the Tensors will be different for each tower even if we reference "self"
-            self._weights = tf.get_variable(name='weights',
+            self._weights = tf.compat.v1.get_variable(name='weights',
                                             shape=[self._m * self._n, self._dim],
                                             initializer=tf.random_uniform_initializer(maxval=1))
 
@@ -205,13 +205,13 @@ class SelfOrganizingMap:
                 # All summary ops are added to a list and then the merge() function is called at the end of
                 # this method
                 mean = tf.reduce_mean(self._weights)
-                self._summary_list.append(tf.summary.scalar('mean', mean))
+                self._summary_list.append(tf.compat.v1.summary.scalar('mean', mean))
                 with tf.name_scope('stdev'):
-                    stdev = tf.sqrt(tf.reduce_mean(tf.squared_difference(self._weights, mean)))
-                self._summary_list.append(tf.summary.scalar('stdev', stdev))
-                self._summary_list.append(tf.summary.scalar('max', tf.reduce_max(self._weights)))
-                self._summary_list.append(tf.summary.scalar('min', tf.reduce_min(self._weights)))
-                self._summary_list.append(tf.summary.histogram('histogram', self._weights))
+                    stdev = tf.sqrt(tf.reduce_mean(tf.compat.v1.squared_difference(self._weights, mean)))
+                self._summary_list.append(tf.compat.v1.summary.scalar('stdev', stdev))
+                self._summary_list.append(tf.compat.v1.summary.scalar('max', tf.reduce_max(self._weights)))
+                self._summary_list.append(tf.compat.v1.summary.scalar('min', tf.reduce_min(self._weights)))
+                self._summary_list.append(tf.compat.v1.summary.histogram('histogram', self._weights))
 
         # Matrix of size [m*n, 2] for SOM grid locations of neurons.
         # Maps an index to an (x,y) coordinate of a neuron in the map for calculating the neighborhood distance
@@ -222,7 +222,7 @@ class SelfOrganizingMap:
             self._input = tf.identity(self._input_tensor)
 
         with tf.name_scope('Epoch'):
-            self._epoch = tf.placeholder("float", [], name="iter")
+            self._epoch = tf.compat.v1.placeholder("float", [], name="iter")
 
         # Start by computing the best matching units / winning units for each input vector in the batch.
         # Basically calculates the Euclidean distance between every
@@ -311,7 +311,7 @@ class SelfOrganizingMap:
 
         # We on;y really care about summaries from one of the tower SOMs, so assign the merge op to
         # the last tower we make. Otherwise there's way too many on Tensorboard.
-        self._merged = tf.summary.merge(self._summary_list)
+        self._merged = tf.compat.v1.summary.merge(self._summary_list)
 
         # With multi-gpu training we collect the results and do the weight assignment on the CPU
         return numerator, denominator

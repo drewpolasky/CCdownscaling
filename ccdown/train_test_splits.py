@@ -10,7 +10,7 @@ from ccdown import utilities
 
 
 def simple_split(x_data, y_data, rean_y=None, split=0.8):
-	train_split = int(round(len(y_data) * split))
+	train_split = 365 * round(int(round(len(y_data) * split))/365)
 	train_x = x_data.isel(time=slice(0, train_split))
 	train_y = y_data.isel(time=slice(0, train_split))
 	test_x = x_data.isel(time=slice(train_split, -1))

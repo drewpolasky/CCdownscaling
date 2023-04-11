@@ -229,8 +229,8 @@ class som_downscale(object):
 					zs[loc].append(plot_weights[j][i] * stdevs[i] + means[i])
 				else:
 					zs[loc].append(plot_weights[j][i])
-			#if var == 'air':
-			#	zs[loc] = np.array(zs[loc]) - 273.15
+			if var == 'air':
+				zs[loc] = np.array(zs[loc]) - 273.15
 		minValue = np.min(list(zs.values()))
 		maxValue = np.max(list(zs.values()))
 
@@ -243,7 +243,6 @@ class som_downscale(object):
 			loc = (j // n, j % n)
 			plot_zs = np.array(zs[loc]).reshape(size_x, size_y)
 			axis = axes[loc[0], loc[1]]
-			print(plot_zs)
 			contours = axis.contourf(plot_zs, levels=np.linspace(minValue, maxValue, 20), cmap=cmap, vmin=minValue,
 									 vmax=maxValue, **kwargs)
 

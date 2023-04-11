@@ -23,10 +23,14 @@ tf.compat.v1.set_random_seed(seed)
 
 def downscale_example(downscaling_target='precip', station_id='725300-94846', split_type='simple'):
     # dictionary of variables and pressure levels to use from the reanalysis data
-    input_vars = {'air': 850, 'rhum': 850, 'uwnd': 700, 'vwnd': 700, 'hgt': 500}
+    input_vars = {'air': 850, 'rhum': 850, 'uwnd': 700, 'vwnd': 700, 'hgt': 500, 'slp':'surf'}
     station_data = pd.read_csv('./data/stations/' + station_id + '.csv')
     station_data = station_data.replace(to_replace=[99.99, 9999.9], value=np.nan)
-    reanalysis_data = xarray.open_mfdataset('./data/models/*NCEP*')
+
+    reanalysis_data_pres = xarray.open_mfdataset('./data/models/pres_level/*NCEP*')
+    reanalysis_data_surf = xarray.open_mfdataset('./data/models/surface/slp*NCEP*')
+
+    reanalysis_data = xarray.merge([reanalysis_data_surf, reanalysis_data_pres])
 
     stations_info = pd.read_csv('./data/stations/stations.csv')
     station_info = stations_info.loc[stations_info['stationID'] == station_id]
@@ -41,8 +45,8 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         rean_precip = rean_precip['prate'].sel(lat=station_lat, lon=station_lon, method='nearest').values
         rean_precip = np.squeeze(rean_precip)
     elif downscaling_target == 'max_temp':
-        rean_precip = xarray.open_mfdataset('./data/models/air_1976-2005_NCEP_midwest.nc')
-        rean_precip = rean_precip['air'].sel(level=1000, lat=station_lat, lon=station_lon, method='nearest').values
+        rean_precip = xarray.open_mfdataset('./data/models/surface/air.sig995_1976-2005_NCEP_midwest.nc')
+        rean_precip = rean_precip['air'].sel(lat=station_lat, lon=station_lon, method='nearest').values
         # convert K to C
         rean_precip = rean_precip - 273.15
         rean_precip = np.squeeze(rean_precip)
@@ -86,6 +90,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     hist_data = xarray.DataArray(data=hist_data, dims=['time'], coords={'time': dates})
     rean_precip = xarray.DataArray(data=rean_precip, dims=['time'], coords={'time': dates})
 
+    train_data_list = None
     # with a simple split:
     if split_type == 'simple':
         train_data, train_hist, test_data, test_hist, rean_precip_train, rean_precip_test = train_test_splits.simple_split(
@@ -107,13 +112,14 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         train_data_list, train_hist_list, test_data_list, test_hist_list, rean_precip_train_list, rean_precip_test_list = train_test_splits.cross_validation_sets(
             reanalysis_data, hist_data, rean_precip, split=0.8, split_by_year=True, num_sets=5)
 
-    if type(train_data) is not list:
+    if train_data_list is None:
         train_data_list = [train_data]
         train_hist_list = [train_hist]
         test_data_list = [test_data]
         test_hist_list = [test_hist]
         rean_precip_train_list = [rean_precip_train]
         rean_precip_test_list  = [rean_precip_test]
+
 
     outputs = []
     for i in range(len(train_data_list)):
@@ -126,10 +132,15 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         input_train_data = []
         input_test_data = []
         for var in input_vars:
-            var_data = train_data.sel(level=input_vars[var])[var].values
+            if input_vars[var] == 'surf':
+                var_data = train_data[var].values
+                var_test_data = test_data[var].values
+            else:
+                var_data = train_data.sel(level=input_vars[var])[var].values
+                var_test_data = test_data.sel(level=input_vars[var])[var].values
+
             var_data = var_data.reshape(var_data.shape[0], var_data.shape[1] * var_data.shape[2])
             input_train_data.append(var_data)
-            var_test_data = test_data.sel(level=input_vars[var])[var].values
             var_test_data = var_test_data.reshape(var_test_data.shape[0], var_test_data.shape[1] * var_test_data.shape[2])
             input_test_data.append(var_test_data)
         input_train_data = np.concatenate(input_train_data, axis=1)
@@ -151,8 +162,8 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         #test_hist, test_data = utilities.remove_missing(test_hist, test_data)
 
         print(train_data.shape, test_data.shape, train_hist.shape, test_hist.shape)
-        print(np.nanpercentile(train_hist, 90))
-        print(np.nanpercentile(test_hist, 90))
+        print("train data 90th percentile: ",  np.nanpercentile(train_hist, 90))
+        print("test data 90th percentile: ", np.nanpercentile(test_hist, 90))
 
         # initialize the different methods
         som = som_downscale.som_downscale(som_x=7, som_y=5, batch=512, alpha=0.1, epochs=50)
@@ -188,8 +199,8 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
 
         # Include the reanalysis precipitation as an undownscaled comparison
         names = ['SOM', 'Random Forest', 'RF Two Part', 'Linear', 'Qmap', 'NCEP']
-        outputs.append([som_output, random_forest_output, rf_two_part_output, linear_output, qmap_output,
-                  rean_precip_test])
+        outputs = [som_output, random_forest_output, rf_two_part_output, linear_output, qmap_output,
+                  rean_precip_test]
         #names = ['SOM', 'Random Forest', 'Qmap']
         #outputs = [som_output, random_forest_output, qmap_output]
 
@@ -221,7 +232,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         for axis, row in zip(ax[:, 0], range(0, som.som_y)):
             axis.set_ylabel(row, rotation=0, fontsize=14)
         # fig.suptitle(var)
-        units = {'air': r'($^\circ$C)', 'rhum': '(%)', 'uwnd': r'(ms$^{-1}$)', 'vwnd': r'(ms$^{-1}$)', 'hgt': '(m)'}
+        units = {'air': r'($^\circ$C)', 'rhum': '(%)', 'uwnd': r'(ms$^{-1}$)', 'vwnd': r'(ms$^{-1}$)', 'hgt': '(m)', 'slp':'(hPa)'}
         cbar.set_label(var.capitalize() + ' ' + units[var], rotation='vertical', labelpad=20, fontsize=14)
         fig.savefig('example_figures/SOM_nodes_'+split_type+'_NCEP_' + var + '.png')
         #plt.show()
@@ -229,10 +240,12 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
         i += 1
 
     #combine methods outputs if using methods with multiple training/test cases, such as cross validation
-    combined_outputs = []
-    for i in range(len(outputs)):
-        combined_outputs = np.array(outputs[:, i]).ravel()
-    outputs = combined_outputs
+    print(np.array(outputs).shape)
+    if len(np.array(outputs).shape) > 2:
+        combined_outputs = []
+        for i in range(len(outputs)):
+                combined_outputs = np.array(outputs[:, i]).ravel()
+        outputs = combined_outputs
 
     # next, the various skill metric scores
     scores = {}
@@ -268,7 +281,7 @@ def downscale_example(downscaling_target='precip', station_id='725300-94846', sp
     plt.close('all')
 
     for i in range(len(outputs)):
-        climdex_values, func_list = climdex.calc_climdex(outputs[i], downscaling_target, reference_data = train_hist)
+        climdex_values, func_list = climdex.calc_climdex(outputs[i], downscaling_target, reference_data = train_hist, year_size=365)
         print()
         print(names[i])
         climdex.print_indices(climdex_values, func_list)

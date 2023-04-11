@@ -98,7 +98,10 @@ def organize_labeled_data(input_vars, reanalysis_data, window=0):
 		if type(input_vars[var]) is not list:
 			input_vars[var] = [input_vars[var]]
 		for level in input_vars[var]:
-			var_data = reanalysis_data.sel(level=level)[var].values
+			if level == 'surf':
+				var_data = reanalysis_data[var].values
+			else:
+				var_data = reanalysis_data.sel(level=level)[var].values
 			if window != 0:
 				var_labels = np.array([[var + '_' + str(level) + '_' + str(i) + '_' + str(j) for i in range(-window, window+1)] for j in range(-window, window+1)])
 			else:
@@ -118,12 +121,15 @@ def test_selection():
 	#Test case for the variable selection code using the o'hare example
 	station_id = '725300-94846'
 	downscaling_target = 'max_temp'
-	input_vars = {'air': [1000, 850, 700, 600, 500, 300], 'rhum': [1000, 850, 700, 600, 500, 300],
-				  'uwnd': [1000, 850, 700, 600, 500, 300], 'vwnd': [1000, 850, 700, 600, 500, 300],
-				  'hgt': [1000, 850, 700, 600, 500, 300]}
+	input_vars = {'air': [850, 700, 600, 500, 300], 'rhum': [850, 700, 600, 500, 300],
+				  'uwnd': [850, 700, 600, 500, 300], 'vwnd': [850, 700, 600, 500, 300],
+				  'hgt': [850, 700, 600, 500, 300], 'slp':['surf'], 'air_surf':['surf'], 'rhum_surf':['surf'], 'uwnd_surf':['surf'], 'vwnd_surf':['surf']}
 	station_data = pd.read_csv('../example/data/stations/' + station_id + '.csv')
 	station_data = station_data.replace(to_replace=[99.99, 9999.9], value=np.nan)
-	reanalysis_data = xarray.open_mfdataset('../example/data/models/*NCEP*')
+	reanalysis_data_pres = xarray.open_mfdataset('../example/data/models/pres_level/*NCEP*')
+	reanalysis_data_surf = xarray.open_mfdataset('../example/data/models/surface/*NCEP*')
+	reanalysis_data_surf = reanalysis_data_surf.rename({'air':'air_surf','rhum':'rhum_surf','uwnd':'uwnd_surf','vwnd':'vwnd_surf'})
+	reanalysis_data = xarray.merge([reanalysis_data_surf, reanalysis_data_pres])
 
 	stations_info = pd.read_csv('../example/data/stations/stations.csv')
 	station_info = stations_info.loc[stations_info['stationID'] == station_id]
