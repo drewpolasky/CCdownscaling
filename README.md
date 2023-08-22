@@ -36,3 +36,17 @@ and split_type (simple, percentile, seasonal):
 python ohare_example.py
 ```
 There is also a jupyter notebook with the same example included in the example folder. 
+
+## Citation
+
+If you use CCdownscaling, please cite:
+
+Andrew D. Polasky, Jenni L. Evans, Jose D. Fuentes,
+CCdownscaling: A Python package for multivariable statistical climate model downscaling,
+Environmental Modelling & Software,
+Volume 165,
+2023,
+105712,
+ISSN 1364-8152,
+https://doi.org/10.1016/j.envsoft.2023.105712.
+
