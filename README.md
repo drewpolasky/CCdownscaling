@@ -19,7 +19,7 @@ export PYTHONPATH=$PWD:$PYTHONPATH
 ## Usage
 
 An example use case for downscaling precipitation at Chicago O'Hare airport can be found in the example folder.
-This example requires some example data, which can be downloaded from: https://zenodo.org/record/6506677
+This example requires some example data, which can be downloaded from: https://zenodo.org/records/7817799
 
 Once that data is in place, the example can be run with: 
 ```bash
